@@ -24,8 +24,10 @@ import re
 # you may use urllib to encode data appropriately
 import urllib.parse
 
+
 def help():
     print("httpclient.py [GET/POST] [URL]\n")
+
 
 class HTTPResponse(object):
     def __init__(self, code=200, body=""):
@@ -41,14 +43,42 @@ class HTTPClient(object):
         return None
 
     def get_code(self, data):
-        return None
+        return int(data.split()[1])
 
     def get_headers(self,data):
         return None
 
     def get_body(self, data):
-        return None
-    
+        return data.split("\r\n\r\n")[1]
+
+    def get_parsed_url_info(self, url):
+        parsed_url = urllib.parse.urlparse(url)
+
+        path = parsed_url.path
+        port = parsed_url.port
+
+        if not port:
+            port = self.get_port(parsed_url.scheme)
+
+        if not path:
+            path = "/"
+
+        return path, port, parsed_url.hostname
+
+    def get_port(self, url_scheme):
+        if url_scheme == "http":
+            return 80
+        elif url_scheme == "https":
+            return 443
+
+    def get_data(self, hostname, port, request):
+        self.connect(hostname, port)
+        self.sendall(request)
+        data = self.recvall(self.socket)
+        self.close()
+
+        return data
+
     def sendall(self, data):
         self.socket.sendall(data.encode('utf-8'))
         
@@ -67,10 +97,26 @@ class HTTPClient(object):
                 done = not part
         return buffer.decode('utf-8')
 
-    def GET(self, url, args=None):
-        code = 500
-        body = ""
+    def send_request(self, data):
+        if not data:
+            return HTTPResponse(404, "")
+
+        code = self.get_code(data)
+        body = self.get_body(data)
+
+        print("data", data)
+        print("status code, body", code, body)
+
         return HTTPResponse(code, body)
+
+    def GET(self, url, args=None):
+        path, port, hostname = self.get_parsed_url_info(url)
+
+        request = ("GET {} HTTP/1.1\r\nHost: {}\r\nAccept: */*\r\nConnection: Closed\r\n\r\n"
+                   .format(path, hostname))
+        data = self.get_data(hostname, port, request)
+
+        return self.send_request(data)
 
     def POST(self, url, args=None):
         code = 500
