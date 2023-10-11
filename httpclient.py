@@ -34,9 +34,8 @@ class HTTPResponse(object):
         self.code = code
         self.body = body
 
-class HTTPClient(object):
-    #def get_host_port(self,url):
 
+class HTTPClient(object):
     def connect(self, host, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((host, port))
@@ -45,7 +44,7 @@ class HTTPClient(object):
     def get_code(self, data):
         return int(data.split()[1])
 
-    def get_headers(self,data):
+    def get_headers(self, data):
         return None
 
     def get_body(self, data):
@@ -56,12 +55,16 @@ class HTTPClient(object):
 
         path = parsed_url.path
         port = parsed_url.port
+        query = parsed_url.query
 
         if not port:
             port = self.get_port(parsed_url.scheme)
 
         if not path:
             path = "/"
+
+        if query:
+            path += "?{}".format(query)
 
         return path, port, parsed_url.hostname
 
@@ -119,9 +122,21 @@ class HTTPClient(object):
         return self.send_request(data)
 
     def POST(self, url, args=None):
-        code = 500
-        body = ""
-        return HTTPResponse(code, body)
+        path, port, hostname = self.get_parsed_url_info(url)
+
+        if args:
+            request_body = urllib.parse.urlencode(args)
+            content_length = str(len(request_body))
+            content_type = "\r\nContent-Type: application/x-www-form-urlencoded"
+        else:
+            content_length, content_type, request_body = "0", "", ""
+
+        request = ("POST {} HTTP/1.1\r\nHost: {}\r\nAccept: */*\r\n \
+                        Connection: Closed\r\nContent-Length: {}{}\r\n\r\n{}"
+                   .format(path, hostname, content_length, content_type, request_body))
+        data = self.get_data(hostname, port, request)
+
+        return self.send_request(data)
 
     def command(self, url, command="GET", args=None):
         if (command == "POST"):
