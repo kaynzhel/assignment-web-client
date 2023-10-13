@@ -42,39 +42,58 @@ class HTTPClient(object):
         return None
 
     def get_code(self, data):
+        """
+        Get the status code from data response
+        """
         return int(data.split()[1])
 
     def get_headers(self, data):
         return None
 
     def get_body(self, data):
+        """
+        Get the body from data response
+        """
         return data.split("\r\n\r\n")[1]
 
     def get_parsed_url_info(self, url):
+        """
+        Parsing url to extract url info
+        """
         parsed_url = urllib.parse.urlparse(url)
 
+        # extract needed components
         path = parsed_url.path
         port = parsed_url.port
         query = parsed_url.query
 
-        if not port:
-            port = self.get_port(parsed_url.scheme)
-
+        # if there's no path, set default
         if not path:
             path = "/"
 
+        # if the url has any query, add it to path
         if query:
             path += "?{}".format(query)
+
+        # if there's no port, set one
+        if not port:
+            port = self.get_port(parsed_url.scheme)
 
         return path, port, parsed_url.hostname
 
     def get_port(self, url_scheme):
+        """
+        Helper method to return appropriate port number when port is missing
+        """
         if url_scheme == "http":
             return 80
         elif url_scheme == "https":
             return 443
 
     def get_data(self, hostname, port, request):
+        """
+        Helper method that reads the data given GET or POST request
+        """
         self.connect(hostname, port)
         self.sendall(request)
         data = self.recvall(self.socket)
@@ -100,30 +119,46 @@ class HTTPClient(object):
                 done = not part
         return buffer.decode('utf-8')
 
-    def send_request(self, data):
+    def send_http_response(self, data):
+        """
+        Helper between GET and POST to send their corresponding HTTP responses
+        Also prints out the result to stdout
+        :param data:
+        :return:
+        """
+        # when there's no data, send 404
         if not data:
             return HTTPResponse(404, "")
 
+        # get corresponding code and body to use to send the HTTPResponse
         code = self.get_code(data)
         body = self.get_body(data)
 
-        print("data", data)
-        print("status code, body", code, body)
+        # print result to stdout
+        print("Full result:\n{}\nStatus code: {}\nBody: {}\n".format(data, code, body))
 
         return HTTPResponse(code, body)
 
     def GET(self, url, args=None):
-        path, port, hostname = self.get_parsed_url_info(url)
+        """
+        method to send the HTTP response from the GET request given url info
+        """
+        path, port, hostname = self.get_parsed_url_info(url)    # get all needed url info
 
+        # format the request
         request = ("GET {} HTTP/1.1\r\nHost: {}\r\nAccept: */*\r\nConnection: Closed\r\n\r\n"
                    .format(path, hostname))
-        data = self.get_data(hostname, port, request)
+        data = self.get_data(hostname, port, request)   # get the result from the request
 
-        return self.send_request(data)
+        return self.send_http_response(data)
 
     def POST(self, url, args=None):
-        path, port, hostname = self.get_parsed_url_info(url)
+        """
+        method to send the HTTP response from the POST request given url info
+        """
+        path, port, hostname = self.get_parsed_url_info(url)    # get all needed url info
 
+        # since this is in POST, need to gather more arguments from param args
         if args:
             request_body = urllib.parse.urlencode(args)
             content_length = str(len(request_body))
@@ -131,12 +166,13 @@ class HTTPClient(object):
         else:
             content_length, content_type, request_body = "0", "", ""
 
+        # format the request
         request = ("POST {} HTTP/1.1\r\nHost: {}\r\nAccept: */*\r\n \
                         Connection: Closed\r\nContent-Length: {}{}\r\n\r\n{}"
                    .format(path, hostname, content_length, content_type, request_body))
-        data = self.get_data(hostname, port, request)
+        data = self.get_data(hostname, port, request)   # get the result from the request
 
-        return self.send_request(data)
+        return self.send_http_response(data)
 
     def command(self, url, command="GET", args=None):
         if (command == "POST"):
