@@ -60,6 +60,8 @@ class HTTPClient(object):
         """
         Parsing url to extract url info
         """
+        # Reference: urllib.parse documentation
+        # https://docs.python.org/3/library/urllib.parse.html
         parsed_url = urllib.parse.urlparse(url)
 
         # extract needed components
